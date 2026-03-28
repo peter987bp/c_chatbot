@@ -1,3 +1,5 @@
+import React from "react";
+
 export default function MessageList({ messages, isLoading }) {
   return (
     <div className="message-list">

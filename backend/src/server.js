@@ -16,15 +16,30 @@ app.get("/health", (_req, res) => {
 });
 
 app.post("/api/chat", async (req, res) => {
-  const { message } = req.body ?? {};
+  const { message, messages } = req.body ?? {};
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "A message string is required." });
   }
 
+  if (
+    messages !== undefined &&
+    (!Array.isArray(messages) ||
+      messages.some(
+        (entry) =>
+          !entry ||
+          (entry.role !== "user" && entry.role !== "assistant") ||
+          typeof entry.text !== "string"
+      ))
+  ) {
+    return res.status(400).json({
+      error: "Messages must be an array of { role, text } objects."
+    });
+  }
+
   try {
-    const reply = await generateResponse(message);
-    return res.json({ reply });
+    const result = await generateResponse(message, messages);
+    return res.json(result);
   } catch (error) {
     console.error("Chat endpoint error:", error);
     return res.status(500).json({
