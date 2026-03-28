@@ -13,12 +13,44 @@ function getClient() {
   return new BedrockRuntimeClient({ region });
 }
 
-function getMockResponse(message) {
-  return `Mock support reply: I understand you need help with "${message}". Please share any order number or account detail relevant to the issue. If this needs a live person, use Talk to Agent.`;
+function normalizeHistory(messages = []) {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+
+  return messages
+    .filter(
+      (entry) =>
+        entry &&
+        (entry.role === "user" || entry.role === "assistant") &&
+        typeof entry.text === "string" &&
+        entry.text.trim()
+    )
+    .filter((entry, index, history) => {
+      if (entry.role === "assistant" && index === 0) {
+        return false;
+      }
+
+      return history[index - 1]?.role !== entry.role;
+    })
+    .map((entry) => ({
+      role: entry.role,
+      text: entry.text.trim()
+    }));
+}
+
+function getMockResponse(message, messages = []) {
+  const history = normalizeHistory(messages);
+  const lastUserMessage = [...history].reverse().find((entry) => entry.role === "user")?.text;
+  const contextPrefix = lastUserMessage
+    ? `Continuing from your earlier message about "${lastUserMessage}", `
+    : "";
+
+  return `Mock support reply: ${contextPrefix}I understand you need help with "${message}". Please share any order number or account detail relevant to the issue. If this needs a live person, use Talk to Agent.`;
 }
 
 function toBedrockMessages(message, messages = []) {
-  const history = Array.isArray(messages) ? messages : [];
+  const history = normalizeHistory(messages);
 
   return [
     ...history.map((entry) => ({
@@ -46,7 +78,7 @@ export async function generateResponse(message, messages = []) {
 
   if (!client || !modelId) {
     return {
-      reply: getMockResponse(message),
+      reply: getMockResponse(message, messages),
       source: "mock"
     };
   }
@@ -77,13 +109,13 @@ export async function generateResponse(message, messages = []) {
     }
 
     return {
-      reply: getMockResponse(message),
+      reply: getMockResponse(message, messages),
       source: "mock"
     };
   } catch (error) {
     console.error("Bedrock request failed, falling back to mock response.", error);
     return {
-      reply: getMockResponse(message),
+      reply: getMockResponse(message, messages),
       source: "mock"
     };
   }
