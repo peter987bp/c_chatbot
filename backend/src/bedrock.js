@@ -17,12 +17,38 @@ function getMockResponse(message) {
   return `Mock support reply: I understand you need help with "${message}". Please share any order number or account detail relevant to the issue. If this needs a live person, use Talk to Agent.`;
 }
 
-export async function generateResponse(message) {
+function toBedrockMessages(message, messages = []) {
+  const history = Array.isArray(messages) ? messages : [];
+
+  return [
+    ...history.map((entry) => ({
+      role: entry.role,
+      content: [
+        {
+          text: entry.text
+        }
+      ]
+    })),
+    {
+      role: "user",
+      content: [
+        {
+          text: message
+        }
+      ]
+    }
+  ];
+}
+
+export async function generateResponse(message, messages = []) {
   const modelId = process.env.BEDROCK_MODEL_ID;
   const client = getClient();
 
   if (!client || !modelId) {
-    return getMockResponse(message);
+    return {
+      reply: getMockResponse(message),
+      source: "mock"
+    };
   }
 
   try {
@@ -33,16 +59,7 @@ export async function generateResponse(message) {
           text: systemPrompt
         }
       ],
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              text: message
-            }
-          ]
-        }
-      ]
+      messages: toBedrockMessages(message, messages)
     });
 
     const response = await client.send(command);
@@ -52,9 +69,22 @@ export async function generateResponse(message) {
       .join(" ")
       .trim();
 
-    return text || getMockResponse(message);
+    if (text) {
+      return {
+        reply: text,
+        source: "bedrock"
+      };
+    }
+
+    return {
+      reply: getMockResponse(message),
+      source: "mock"
+    };
   } catch (error) {
     console.error("Bedrock request failed, falling back to mock response.", error);
-    return getMockResponse(message);
+    return {
+      reply: getMockResponse(message),
+      source: "mock"
+    };
   }
 }
