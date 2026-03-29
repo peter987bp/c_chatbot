@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
 import React from "react";
@@ -74,8 +74,11 @@ function getRecentApiMessages(messages) {
 export default function ChatWindow() {
   const [messages, setMessages] = useState(getInitialMessages);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEscalating, setIsEscalating] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [responseSource, setResponseSource] = useState(getInitialSource);
+  const sendLockRef = useRef(false);
+  const escalateLockRef = useRef(false);
 
   useEffect(() => {
     window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(messages));
@@ -91,6 +94,11 @@ export default function ChatWindow() {
   }, [responseSource]);
 
   async function handleSendMessage(text) {
+    if (sendLockRef.current) {
+      return;
+    }
+
+    sendLockRef.current = true;
     const userMessage = {
       id: crypto.randomUUID(),
       sender: "user",
@@ -147,12 +155,19 @@ export default function ChatWindow() {
       ]);
     } finally {
       window.clearTimeout(timeoutId);
+      sendLockRef.current = false;
       setIsLoading(false);
     }
   }
 
   async function handleEscalate() {
+    if (escalateLockRef.current) {
+      return;
+    }
+
+    escalateLockRef.current = true;
     setStatusMessage("");
+    setIsEscalating(true);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/escalate`, {
@@ -171,6 +186,9 @@ export default function ChatWindow() {
       );
     } catch (error) {
       setStatusMessage(ESCALATION_PLACEHOLDER_MESSAGE);
+    } finally {
+      escalateLockRef.current = false;
+      setIsEscalating(false);
     }
   }
 
@@ -186,7 +204,12 @@ export default function ChatWindow() {
             </span>
           ) : null}
         </div>
-        <button type="button" className="secondary-button" onClick={handleEscalate}>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={handleEscalate}
+          disabled={isEscalating}
+        >
           Talk to Agent
         </button>
       </div>
