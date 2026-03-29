@@ -59,7 +59,7 @@ PORT=3001
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_access_key_id
 AWS_SECRET_ACCESS_KEY=your_secret_access_key
-BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
+BEDROCK_MODEL_ID=anthropic.claude-3-haiku-20240307-v1:0
 
 Start backend:
 
@@ -102,6 +102,8 @@ Response Shape
 }
 reply = chatbot response
 source = indicates real AI vs fallback
+
+
 🔄 Behavior Details
 Multi-Turn Context
 Frontend sends full transcript
@@ -121,6 +123,24 @@ AWS credentials missing
 Bedrock call fails
 Clearly indicated in UI
 Allows local development without AWS setup
+
+### Safety & Guardrails
+
+The chatbot includes basic safety and truthfulness guardrails:
+
+- Prevents generating:
+  - Phone numbers
+  - Email addresses
+  - URLs
+  - Placeholder text (e.g. "[insert support number]")
+- Blocks false claims such as:
+  - “Your reservation is confirmed”
+  - “I have escalated your request”
+  - “A live agent will contact you”
+- Falls back to safe response when output is deemed unsafe
+
+These rules ensure the chatbot does not fabricate actions or sensitive information.
+
 ⚠️ Limitations (Intentional for MVP)
 No authentication
 No database / long-term persistence
