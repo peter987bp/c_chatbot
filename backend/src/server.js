@@ -7,8 +7,13 @@ import chatRouter from "./routes/chat.js";
 
 const app = express();
 const port = process.env.PORT || 3001;
+const allowedOrigin = process.env.FRONTEND_ORIGIN;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: allowedOrigin ? [allowedOrigin] : true
+  })
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -25,6 +30,6 @@ app.post("/api/escalate", (_req, res) => {
   });
 });
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`Backend server listening on http://localhost:${port}`);
 });
