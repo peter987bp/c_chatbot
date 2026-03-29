@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
 import React from "react";
+import { CHAT_LIMITS } from "../../../shared/chatLimits.js";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 const SESSION_STORAGE_KEY = "chat-window-messages";
 const SOURCE_STORAGE_KEY = "chat-window-source";
+const ESCALATION_PLACEHOLDER_MESSAGE =
+  "Talk to Agent is a demo placeholder in this MVP. For live support, this would connect to an agent workflow.";
 
 const initialMessages = [
   {
@@ -54,7 +57,7 @@ function getInitialSource() {
   }
 
   const savedSource = window.sessionStorage.getItem(SOURCE_STORAGE_KEY);
-  return savedSource === "bedrock" || savedSource === "mock" ? savedSource : null;
+  return savedSource === "bedrock" ? savedSource : null;
 }
 
 function toApiMessages(messages) {
@@ -62,6 +65,10 @@ function toApiMessages(messages) {
     role: message.sender === "user" ? "user" : "assistant",
     text: message.text
   }));
+}
+
+function getRecentApiMessages(messages) {
+  return toApiMessages(messages).slice(-CHAT_LIMITS.maxHistoryMessages);
 }
 
 export default function ChatWindow() {
@@ -89,7 +96,7 @@ export default function ChatWindow() {
       sender: "user",
       text
     };
-    const messageHistory = toApiMessages(messages);
+    const messageHistory = getRecentApiMessages(messages);
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), 8000);
 
@@ -128,6 +135,7 @@ export default function ChatWindow() {
         error.name === "AbortError"
           ? "The request timed out. Please try again or talk to an agent."
           : "There was a problem reaching support. Please try again.";
+      setResponseSource("mock");
 
       setMessages((current) => [
         ...current,
@@ -157,12 +165,12 @@ export default function ChatWindow() {
 
       const data = await response.json();
       setStatusMessage(
-        data.status === "initiated"
-          ? "Escalation initiated. A live agent will be available soon."
-          : "Escalation request completed."
+        typeof data.message === "string" && data.message.trim()
+          ? data.message.trim()
+          : ESCALATION_PLACEHOLDER_MESSAGE
       );
     } catch (error) {
-      setStatusMessage("Unable to initiate escalation right now.");
+      setStatusMessage(ESCALATION_PLACEHOLDER_MESSAGE);
     }
   }
 

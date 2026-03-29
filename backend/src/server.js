@@ -18,7 +18,11 @@ app.get("/health", (_req, res) => {
 app.use("/api", chatRouter);
 
 app.post("/api/escalate", (_req, res) => {
-  res.json({ status: "initiated" });
+  res.json({
+    status: "placeholder",
+    message:
+      "Talk to Agent is a demo placeholder in this MVP. For live support, this would connect to an agent workflow."
+  });
 });
 
 app.listen(port, () => {
