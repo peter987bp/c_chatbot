@@ -1,10 +1,10 @@
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 
 const systemPrompt =
-  "You are a helpful customer support assistant. Be concise. Suggest escalation if needed.";
+  "You are a helpful Caesars customer support assistant. Be concise. Suggest escalation if needed.";
 
 function getClient() {
-  const region = process.env.AWS_REGION;
+  const region = process.env.AWS_REGION?.trim();
 
   if (!region) {
     return null;
@@ -26,13 +26,6 @@ function normalizeHistory(messages = []) {
         typeof entry.text === "string" &&
         entry.text.trim()
     )
-    .filter((entry, index, history) => {
-      if (entry.role === "assistant" && index === 0) {
-        return false;
-      }
-
-      return history[index - 1]?.role !== entry.role;
-    })
     .map((entry) => ({
       role: entry.role,
       text: entry.text.trim()
@@ -50,35 +43,30 @@ function getMockResponse(message, messages = []) {
 }
 
 function toBedrockMessages(message, messages = []) {
-  const history = normalizeHistory(messages);
-
   return [
-    ...history.map((entry) => ({
+    ...normalizeHistory(messages).map((entry) => ({
       role: entry.role,
-      content: [
-        {
-          text: entry.text
-        }
-      ]
+      content: [{ text: entry.text }]
     })),
     {
       role: "user",
-      content: [
-        {
-          text: message
-        }
-      ]
+      content: [{ text: message.trim() }]
     }
   ];
 }
 
 export async function generateResponse(message, messages = []) {
-  const modelId = process.env.BEDROCK_MODEL_ID;
+  const trimmedMessage = typeof message === "string" ? message.trim() : "";
+  const modelId = process.env.BEDROCK_MODEL_ID?.trim();
   const client = getClient();
+
+  if (!trimmedMessage) {
+    throw new Error("Message is required.");
+  }
 
   if (!client || !modelId) {
     return {
-      reply: getMockResponse(message, messages),
+      reply: getMockResponse(trimmedMessage, messages),
       source: "mock"
     };
   }
@@ -86,36 +74,30 @@ export async function generateResponse(message, messages = []) {
   try {
     const command = new ConverseCommand({
       modelId,
-      system: [
-        {
-          text: systemPrompt
-        }
-      ],
-      messages: toBedrockMessages(message, messages)
+      system: [{ text: systemPrompt }],
+      messages: toBedrockMessages(trimmedMessage, messages)
     });
 
     const response = await client.send(command);
-    const text = response.output?.message?.content
-      ?.filter((item) => item.text)
-      .map((item) => item.text)
+    const reply = response.output?.message?.content
+      ?.filter((item) => typeof item?.text === "string" && item.text.trim())
+      .map((item) => item.text.trim())
       .join(" ")
       .trim();
 
-    if (text) {
-      return {
-        reply: text,
-        source: "bedrock"
-      };
+    if (!reply) {
+      throw new Error("Bedrock returned an empty response.");
     }
 
     return {
-      reply: getMockResponse(message, messages),
-      source: "mock"
+      reply,
+      source: "bedrock"
     };
   } catch (error) {
     console.error("Bedrock request failed, falling back to mock response.", error);
+
     return {
-      reply: getMockResponse(message, messages),
+      reply: getMockResponse(trimmedMessage, messages),
       source: "mock"
     };
   }
